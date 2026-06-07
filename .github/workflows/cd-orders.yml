@@ -1,0 +1,59 @@
+name: CD - orders
+
+# Caso 3/4: a merge to main builds a SHA-tagged image, pushes it to GHCR,
+# deploys it with Helm to the local Kind cluster, verifies the rollout, and
+# rolls back automatically if the rollout fails.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/orders/**'
+      - 'charts/orders/**'
+      - '.github/workflows/cd-orders.yml'
+
+permissions:
+  contents: read
+  packages: write          # required to push to GHCR with GITHUB_TOKEN
+
+jobs:
+  deploy:
+    name: Deploy orders
+    runs-on: self-hosted
+    timeout-minutes: 15
+    env:
+      SERVICE: orders
+      NAMESPACE: the-store
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Resolve GHCR image (must be lowercase)
+        env:
+          OWNER: ${{ github.repository_owner }}
+        run: echo "IMAGE=ghcr.io/${OWNER,,}/the-store-${SERVICE}" >> "$GITHUB_ENV"
+
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Build image tagged with the commit SHA
+        run: docker build -t "$IMAGE:${{ github.sha }}" "src/$SERVICE"
+
+      - name: Push image to GHCR
+        run: docker push "$IMAGE:${{ github.sha }}"
+
+      - name: Deploy with Helm
+        run: |
+          helm upgrade --install "$SERVICE" "charts/$SERVICE" \
+            --namespace "$NAMESPACE" --create-namespace \
+            --set image.repository="$IMAGE" \
+            --set image.tag="${{ github.sha }}"
+
+      - name: Verify rollout
+        run: kubectl rollout status "deployment/$SERVICE" -n "$NAMESPACE" --timeout=120s
+
+      - name: Roll back on failed rollout
+        if: failure()
+        run: |
+          echo "Rollout failed - rolling back $SERVICE to the previous release"
+          helm rollback "$SERVICE" -n "$NAMESPACE" || echo "No previous release to roll back to"
+          exit 1
