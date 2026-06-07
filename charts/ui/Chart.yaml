@@ -1,0 +1,6 @@
+apiVersion: v2
+name: ui
+description: The Store - UI service / API gateway (Java/Spring Boot)
+type: application
+version: 1.0.0
+appVersion: "1.0.0"

@@ -1,0 +1,26 @@
+# Default values for the ui chart.
+# CD overrides image.repository (GHCR) and image.tag (commit SHA) at deploy time.
+# Local defaults point at the image built by local.sh and loaded into Kind.
+image:
+  repository: the-store-ui
+  tag: latest
+  pullPolicy: IfNotPresent
+
+replicaCount: 1
+
+resources:
+  limits:
+    memory: 512Mi
+  requests:
+    cpu: 128m
+    memory: 512Mi
+
+# Internal cluster DNS names of the backend services the UI calls.
+endpoints:
+  catalog: http://catalog
+  carts: http://cart
+  checkout: http://checkout
+  orders: http://orders
+
+ingress:
+  host: localhost
