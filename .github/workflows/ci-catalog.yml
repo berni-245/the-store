@@ -1,0 +1,32 @@
+name: CI - catalog
+
+# Caso 1/2: opening or updating a PR against main builds the image and runs
+# unit tests. Nothing is pushed. A failure blocks the merge (branch protection).
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/catalog/**'
+      - 'charts/catalog/**'
+      - '.github/workflows/ci-catalog.yml'
+
+jobs:
+  build-test:
+    name: Build & test catalog
+    runs-on: self-hosted
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: src/catalog/go.mod
+
+      - name: Run unit tests
+        working-directory: src/catalog
+        run: go test ./...
+
+      - name: Build Docker image (no push)
+        run: docker build -t the-store-catalog:ci src/catalog

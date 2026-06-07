@@ -1,0 +1,39 @@
+name: CI - checkout
+
+# Caso 1/2: opening or updating a PR against main builds the image and runs
+# unit tests. Nothing is pushed. A failure blocks the merge (branch protection).
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/checkout/**'
+      - 'charts/checkout/**'
+      - '.github/workflows/ci-checkout.yml'
+
+jobs:
+  build-test:
+    name: Build & test checkout
+    runs-on: self-hosted
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        working-directory: src/checkout
+        run: yarn install --frozen-lockfile
+
+      # The integration suite uses Testcontainers to start a throwaway Redis and
+      # boots the checkout app against it (no other microservice required). It
+      # needs a Docker daemon, which the self-hosted runner provides.
+      - name: Run integration tests
+        working-directory: src/checkout
+        run: yarn test:integration
+
+      - name: Build Docker image (no push)
+        run: docker build -t the-store-checkout:ci src/checkout

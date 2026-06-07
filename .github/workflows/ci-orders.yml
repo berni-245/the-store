@@ -1,0 +1,33 @@
+name: CI - orders
+
+# Caso 1/2: opening or updating a PR against main builds the image and runs
+# unit tests. Nothing is pushed. A failure blocks the merge (branch protection).
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/orders/**'
+      - 'charts/orders/**'
+      - '.github/workflows/ci-orders.yml'
+
+jobs:
+  build-test:
+    name: Build & test orders
+    runs-on: self-hosted
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Run unit tests
+        working-directory: src/orders
+        run: ./mvnw test
+
+      - name: Build Docker image (no push)
+        run: docker build -t the-store-orders:ci src/orders
