@@ -1,7 +1,5 @@
 # The Store
 
-[![Build](https://github.com/jupmoreno/the-store/actions/workflows/main.yml/badge.svg)](https://github.com/jupmoreno/the-store/actions/workflows/main.yml)
-
 **The Store** is a modern e-commerce platform built with microservices architecture.
 
 Our platform provides a complete shopping experience with:
@@ -30,6 +28,12 @@ The Store is built with a microservices architecture that uses different technol
 - [Docker](https://docs.docker.com/get-docker/) running
 - [Kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation) installed
 - [Kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/) installed
+- [Helm](https://helm.sh/docs/intro/install/) installed
+
+> `local.sh` deploys each service with its Helm chart in [`charts/`](./charts/);
+> the same charts are used by the CD pipeline. See the
+> [CI/CD How-To Guide](./docs/how-to.md) for the pipeline, the self-hosted
+> runner setup, and how deployments and rollbacks are performed.
 
 ### Cluster Management
 
