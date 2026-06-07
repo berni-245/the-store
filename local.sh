@@ -45,6 +45,12 @@ check_prerequisites() {
         exit 1
     fi
     print_success "Kubectl is installed"
+
+    if ! command -v helm &> /dev/null; then
+        print_error "Helm is not installed. Please install Helm first."
+        exit 1
+    fi
+    print_success "Helm is installed"
 }
 
 create_cluster_and_deploy() {
@@ -164,8 +170,15 @@ deploy_services() {
         print_success "Namespace '$NAMESPACE' is ready"
     fi
 
-    print_status "Applying Kubernetes manifests to namespace '$NAMESPACE'..."
-    kubectl apply -f $DIR/dist/kubernetes.yaml -n $NAMESPACE
+    print_status "Deploying services with Helm to namespace '$NAMESPACE'..."
+    for service in $SERVICES; do
+        print_status "helm upgrade --install $service..."
+        helm upgrade --install $service "$DIR/charts/$service" \
+            --namespace $NAMESPACE \
+            --set image.repository=the-store-$service \
+            --set image.tag=$IMAGE_TAG
+    done
+    print_success "All charts deployed"
 
     print_status "Waiting for all deployments to be available..."
     kubectl wait --namespace $NAMESPACE --for=condition=available deployments --timeout=300s --all
