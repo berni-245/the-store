@@ -12,6 +12,8 @@ Bernardo Zapico (Leg. Nº 62318),  [bzapico@itba.edu.ar](mailto:bzapico@itba.edu
 
 21 de abril de 2026
 
+**Este documento queda prohíbido modificarlo.**
+
 ## **1\. Planteo del Problema y Contexto**
 
 Este proyecto aborda el **Tema \#7: CI/CD para el Despliegue y Gestión de Servicios**.

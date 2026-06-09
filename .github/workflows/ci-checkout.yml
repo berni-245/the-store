@@ -1,7 +1,8 @@
 name: CI - checkout
 
 # Caso 1/2: opening or updating a PR against main builds the image and runs
-# unit tests. Nothing is pushed. A failure blocks the merge (branch protection).
+# the integration tests (Testcontainers-backed Redis). Nothing is pushed.
+# A failure blocks the merge (branch protection).
 on:
   pull_request:
     branches: [main]
