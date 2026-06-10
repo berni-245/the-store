@@ -25,6 +25,12 @@ jobs:
         with:
           node-version: '20'
 
+      # yarn is not bundled with Node; Corepack (which IS bundled with Node)
+      # exposes the yarn shim for the job, so nothing has to be installed on the
+      # runner host. yarn.lock is v1, so Corepack's default yarn (1.x) matches.
+      - name: Enable Corepack (provides yarn)
+        run: corepack enable
+
       - name: Install dependencies
         working-directory: src/checkout
         run: yarn install --frozen-lockfile
