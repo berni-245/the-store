@@ -24,6 +24,9 @@ jobs:
         with:
           go-version-file: src/catalog/go.mod
 
+      # No network-timeout flag like yarn/maven here: the Go toolchain fetches
+      # modules through GOPROXY (proxy.golang.org) with built-in retries, so it
+      # is already resilient to a slow/flaky runner connection.
       - name: Run unit tests
         working-directory: src/catalog
         run: go test ./...

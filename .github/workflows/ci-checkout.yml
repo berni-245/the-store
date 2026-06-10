@@ -31,9 +31,11 @@ jobs:
       - name: Enable Corepack (provides yarn)
         run: corepack enable
 
+      # --network-timeout 600000 gives each request 10 min (vs the 30s default)
+      # so a slow/flaky runner connection doesn't abort the dependency download.
       - name: Install dependencies
         working-directory: src/checkout
-        run: yarn install --frozen-lockfile
+        run: yarn install --frozen-lockfile --network-timeout 600000
 
       # The integration suite uses Testcontainers to start a throwaway Redis and
       # boots the checkout app against it (no other microservice required). It

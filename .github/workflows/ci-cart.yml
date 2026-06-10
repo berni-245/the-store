@@ -25,9 +25,11 @@ jobs:
           distribution: temurin
           java-version: '21'
 
+      # Retry failed downloads and raise the HTTP read timeout (10 min) so a
+      # slow/flaky runner connection doesn't abort fetching Maven dependencies.
       - name: Run unit tests
         working-directory: src/cart
-        run: ./mvnw test
+        run: ./mvnw test -Dmaven.wagon.http.retryHandler.count=3 -Dmaven.wagon.rto=600000
 
       - name: Build Docker image (no push)
         run: docker build -t the-store-cart:ci src/cart
