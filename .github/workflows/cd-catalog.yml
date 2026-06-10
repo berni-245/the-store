@@ -15,6 +15,13 @@ permissions:
   contents: read
   packages: write          # required to push to GHCR with GITHUB_TOKEN
 
+# The self-hosted runner is Windows, where run: steps default to PowerShell.
+# Force bash (Git Bash, shipped with Git for Windows) so the bash parameter
+# expansion (${OWNER,,}), $GITHUB_ENV redirection and $IMAGE/$SERVICE refs work.
+defaults:
+  run:
+    shell: bash
+
 jobs:
   deploy:
     name: Deploy catalog
