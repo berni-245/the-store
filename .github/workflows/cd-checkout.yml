@@ -72,3 +72,5 @@ jobs:
           echo "Rollout failed - rolling back $SERVICE to the previous release"
           helm rollback "$SERVICE" -n "$NAMESPACE" || echo "No previous release to roll back to"
           exit 1
+
+# re-trigger: re-running all CD workflows to confirm the checkout manifest 500 was transient
