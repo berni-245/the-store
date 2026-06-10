@@ -220,3 +220,47 @@ kubectl rollout status deployment/catalog -n the-store
 - **Single runner / single cluster**: CI and CD share one self-hosted runner and
   one local Kind cluster, as designed for the POC. Concurrent merges to
   different services are serialized by the runner's job queue.
+
+---
+
+## 9. Windows self-hosted runner: gotchas & troubleshooting
+
+These are the issues we actually hit running the runner on Windows + Docker
+Desktop. On a Linux runner most of them simply don't occur (`dockerd` is a
+system service, LF is native), so Linux is the smoother host if you have the
+choice.
+
+- **`./mvnw` fails in `docker build` with `cannot execute: required file not
+  found` (exit 127).** The Maven wrapper was checked out with CRLF line endings;
+  copied into the Linux image its `#!/bin/sh` shebang becomes `#!/bin/sh\r`,
+  which doesn't exist. The committed `.gitattributes` pins `mvnw`/`*.sh` to LF on
+  every checkout, which fixes this. **Gotcha:** the self-hosted runner reuses its
+  working directory, so a `mvnw` materialized as CRLF *before* `.gitattributes`
+  existed can linger (git won't rewrite a file whose blob is unchanged). Fix it
+  once on the runner: delete those files and re-check them out
+  (`git -C <workdir> checkout -- src/*/mvnw`), or wipe the runner's repo
+  directory; optionally `git config core.autocrlf false` in that checkout.
+
+- **`yarn: command not found` in checkout CI.** `setup-node` provides Node + npm
+  but not yarn. The workflow runs `corepack enable` (Corepack ships *with* Node)
+  to expose the yarn shim — nothing is installed on the host.
+
+- **Dependency downloads time out on a slow/flaky connection.** checkout uses
+  `yarn install --frozen-lockfile --network-timeout 600000`; the Maven services
+  pass `-Dmaven.wagon.http.retryHandler.count=3 -Dmaven.wagon.rto=600000` via the
+  **`MAVEN_OPTS` env var, not the command line** — PowerShell splits those `-D`
+  args into bogus lifecycle phases (`Unknown lifecycle phase ".wagon..."`).
+
+- **A Windows Firewall prompt appears on the first Testcontainers run.** When a
+  test container first publishes a port, Windows Defender Firewall asks to allow
+  it. If it isn't allowed promptly, the test's `beforeAll` stalls and Jest's 30s
+  hook timeout fires. Allow it once (the choice persists).
+
+- **Testcontainers startup occasionally exceeds Jest's 30s hook timeout.** If the
+  Redis container is slow to start (cold image pull, Docker Desktop overhead),
+  raise the limit by adding `"testTimeout": 120000` to
+  `src/checkout/test/jest-e2e.json`.
+
+- **A job seems not to run after opening/updating a PR.** The runner *polls*
+  GitHub, so there's pickup latency, and a single runner serializes jobs — give
+  it a moment rather than assuming it failed.
