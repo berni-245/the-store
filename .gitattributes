@@ -1,0 +1,12 @@
+# Keep Unix shell scripts and the Maven wrapper as LF on every checkout,
+# regardless of the machine's core.autocrlf setting. Without this, a Windows
+# runner (autocrlf=true) rewrites mvnw to CRLF, and copying it into a Linux
+# Docker image makes `./mvnw` fail with exit 127 ("required file not found",
+# because the shebang becomes "#!/bin/sh\r").
+mvnw    text eol=lf
+*.sh    text eol=lf
+
+# Windows batch wrappers stay CRLF.
+mvnw.cmd text eol=crlf
+*.cmd    text eol=crlf
+*.bat    text eol=crlf

@@ -84,37 +84,69 @@ SHA-tagged images pulled from GHCR — same charts, same `helm upgrade` command.
 The CI and CD workflows declare `runs-on: self-hosted`, so they only run on a
 runner you register against the repository.
 
-1. In GitHub: **Settings → Actions → Runners → New self-hosted runner**. Follow
-   the shown commands to download and configure the agent, e.g.:
+1. In GitHub: **Settings → Actions → Runners → New self-hosted runner**. Pick
+   your OS and **copy the commands shown on that page verbatim** — GitHub fills
+   in the registration token for you, e.g.:
    ```bash
    ./config.sh --url https://github.com/<owner>/the-store --token <TOKEN>
    ./run.sh            # starts polling GitHub for jobs
    ```
-   (Install it as a service with `./svc.sh install && ./svc.sh start` to keep it
-   running across reboots.)
+   `<TOKEN>` is **not** a Personal Access Token you generate — it's the
+   short-lived **runner registration token** that page displays (valid ~1 hour,
+   single-use, only for registering). If it expires, reload the page to get a
+   fresh one. (Not to be confused with `GITHUB_TOKEN`, which the workflows use to
+   push to GHCR — see §5.)
 
 2. **Run the agent as a user that can:**
-   - **Reach the Kind cluster** — a valid `~/.kube/config` with the `kind-the-store`
-     context (created by `./local.sh create-cluster`).
-   - **Use Docker** — be in the `docker` group / have access to the Docker socket.
-     This is required both for building images and for checkout's
-     **Testcontainers** integration tests, which launch a throwaway Redis
-     container during CI. No Redis is declared in the workflow — the test starts
-     and stops it itself; it only needs a reachable Docker daemon.
-   - **Pull `redis:6.0-alpine`** on first checkout CI run (cached afterward).
+    - **Reach the Kind cluster** — a valid `~/.kube/config` with the `kind-the-store`
+      context (created by `./local.sh create-cluster`).
+    - **Use Docker** — be in the `docker` group / have access to the Docker socket.
+      This is required both for building images and for the **Testcontainers**
+      tests that several services run during CI: they launch throwaway containers
+      (catalog → MySQL, cart → DynamoDB-local, orders → Postgres, checkout →
+      Redis). Nothing is declared in the workflows — each test starts and stops
+      its container itself; it only needs a reachable Docker daemon.
+    - **Pull the test images** (`mysql:8.0`, `postgres`, `redis:6.0-alpine`, …) on
+      the first run of each service's CI (cached afterward).
 
 3. Confirm `helm`, `kubectl`, and `docker` are on the runner user's `PATH`.
+
+> ⚠️ **The Docker daemon must already be running when the runner executes a job.**
+> The Testcontainers tests connect to the daemon directly (on Windows via the
+> `\\.\pipe\docker_engine` named pipe; on Linux via `/var/run/docker.sock`). If
+> the daemon isn't up, those tests fail with **"Could not find a valid Docker
+> environment"** while the non-Docker tests still pass — making it look like a
+> code failure when it's really an environment one.
+> - **Windows/Docker Desktop:** Docker Desktop is a per-user app, so it must be
+    >   running in the **same session** as the runner. Enable *Settings → "Start
+    >   Docker Desktop when you log in"* and start the runner only after Docker is up.
+    >   (A runner installed as a *service* under a different account will not see
+    >   Docker Desktop's pipe.)
+> - **Linux:** `dockerd` runs as a system service and the socket is always
+    >   present, so this is a non-issue — the more robust host for a
+    >   Testcontainers-heavy CI plus a local Kind cluster.
+    > Quick check on the runner host: `docker version` should print a **Server**
+    > section (not just the client).
 
 ---
 
 ## 5. Configure GitHub: branch protection + GHCR
 
 ### Branch protection (enables Caso 2 / Caso 3)
-**Settings → Branches → Add rule** for `main`:
-- ✅ Require a pull request before merging (require **N** approvals).
-- ✅ Require status checks to pass before merging → select the per-service CI
-  checks (e.g. `Build & test catalog`). A failed CI check then blocks the merge
-  button.
+**Settings → Rules → Rulesets → New ruleset → New branch ruleset**:
+
+| Field | What to set |
+|-------|-------------|
+| **Ruleset Name** | anything, e.g. `protect-main` |
+| **Enforcement status** | **Active** (otherwise the rule does nothing) |
+| **Target branches** | Add target → **Include default branch** (or pattern `main`) |
+| ✅ **Require a pull request before merging** | Set **Required approvals** = `1` (or N) |
+| ✅ **Require status checks to pass** | **Add checks** → add the per-service CI checks, e.g. `Build & test catalog` |
+
+⚠️ A status check name only appears in the **Add checks** list *after it has run
+at least once* — open one PR first to let CI run, then come back and add it. A
+failed CI check then disables the merge button. Leave the other rules (signed
+commits, linear history, …) off for this POC.
 
 ### GHCR packages must be public (so Kind can pull without a secret)
 The **first** CD run creates each package as **private**. For Kind to pull the
@@ -136,9 +168,9 @@ service (path filter on `src/<svc>/**` and `charts/<svc>/**`). Steps:
 1. Checkout.
 2. Set up the toolchain (Go / JDK 21 / Node 20).
 3. Run the service's tests:
-   - catalog → `go test ./...`
-   - cart / orders / ui → `./mvnw test`
-   - checkout → `yarn test:integration` (Testcontainers Redis + chaos tests)
+    - catalog → `go test ./...`
+    - cart / orders / ui → `./mvnw test`
+    - checkout → `yarn test:integration` (Testcontainers Redis + chaos tests)
 4. `docker build` the image (tagged `:ci`, **not pushed**).
 
 A failure turns the PR check red and — with branch protection — blocks merging.
