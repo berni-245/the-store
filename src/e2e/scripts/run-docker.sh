@@ -75,4 +75,7 @@ cd $script_dir/../
 
 docker build -t retail-store-sample-e2e:run --pull --quiet -f Dockerfile.run .
 
-docker run -i --rm --network $network -v $PWD:/e2e --env CYPRESS_BASE_URL="${args[0]}" -w /e2e retail-store-sample-e2e:run
+# MSYS_NO_PATHCONV=1 stops Git Bash (MSYS2) on Windows from rewriting the
+# container-internal paths (/e2e) into host paths like C:/Program Files/Git/e2e.
+# The variable is ignored on Linux/macOS, so this is a no-op there.
+MSYS_NO_PATHCONV=1 docker run -i --rm --network $network -v "$PWD":/e2e --env CYPRESS_BASE_URL="${args[0]}" -w /e2e retail-store-sample-e2e:run

@@ -116,12 +116,15 @@ docker build -t retail-store-sample-loadgen:run --pull --quiet -f Dockerfile.run
 
 container_name="retail-store-loadgen-$(date +%s)"
 
-docker run --name "$container_name" --network $network -v $PWD:/scripts \
+# MSYS_NO_PATHCONV=1 stops Git Bash (MSYS2) on Windows from rewriting the
+# container-internal paths (/scripts, /tmp/output.json) into host paths like
+# C:/Program Files/Git/scripts. The variable is ignored on Linux/macOS.
+MSYS_NO_PATHCONV=1 docker run --name "$container_name" --network $network -v "$PWD":/scripts \
   retail-store-sample-loadgen:run \
   run -t $target $quiet_args --output /tmp/output.json --overrides "$overrides_args" /scripts/scenario.yml
 
 if [ -n "$output" ]; then
-  docker cp "$container_name:/tmp/output.json" "$output"
+  MSYS_NO_PATHCONV=1 docker cp "$container_name:/tmp/output.json" "$output"
 fi
 
 docker rm "$container_name"
