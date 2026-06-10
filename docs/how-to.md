@@ -149,11 +149,32 @@ failed CI check then disables the merge button. Leave the other rules (signed
 commits, linear history, …) off for this POC.
 
 ### GHCR packages must be public (so Kind can pull without a secret)
-The **first** CD run creates each package as **private**. For Kind to pull the
-image without an `imagePullSecret`, make it public once:
 
-**GitHub → your profile/org → Packages → `the-store-<svc>` → Package settings →
-Change visibility → Public.**
+This is a **one-time bootstrap per service** (5 packages total). Once a package
+is public it stays public and every later CD run is fully automated.
+
+**Why it's needed:** the **first** CD run for a service pushes the image and
+creates its GHCR package as **private**. Kind pulls images with no
+`imagePullSecret`, so on that first run `kubectl rollout status` will **fail** —
+the pod can't pull a private image. This looks like a deploy bug but it's config.
+
+**Fix it once, per service:**
+1. Let the first CD run push the image (the `docker push` step succeeds even
+   though the rollout then fails).
+2. **GitHub → your profile/org → Packages → `the-store-<svc>` → Package settings
+   → Change visibility → Public.**
+3. Re-run the failed CD job (or push again) → the rollout now succeeds.
+
+After this, `the-store-<svc>` is public forever and CD needs no manual steps.
+
+> This can't be automated within the design: the auto-provisioned `GITHUB_TOKEN`
+> can't change package visibility (it's UI-only), and the alternatives
+> (`imagePullSecret`, or a stored PAT) would add secrets that `solution.md`
+> explicitly rules out.
+
+**Prerequisite:** ensure **Settings → Actions → General → Workflow permissions**
+is **not** "read-only" — otherwise the `docker push` step 403s despite the
+workflow's `permissions: packages: write`.
 
 No registry secret is needed: the workflows authenticate to GHCR with the
 auto-provisioned `GITHUB_TOKEN` (granted push via `permissions: packages: write`).
