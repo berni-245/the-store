@@ -78,4 +78,4 @@ To clean up:
 docker compose down
 ```
 
-<!-- ci: trigger pipeline run -->
+<!-- ci: trigger all CD 2026-06-10 -->
