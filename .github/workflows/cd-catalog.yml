@@ -31,6 +31,14 @@ jobs:
       SERVICE: catalog
       NAMESPACE: the-store
     steps:
+      # On the Windows runner `shell: bash` otherwise resolves to WSL's bash
+      # (C:\Windows\System32\bash.exe), which has no distro installed and fails.
+      # Prepend Git Bash so the bash steps below use it. Skipped on Linux.
+      - name: Prefer Git Bash over WSL (Windows runner)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: Add-Content -Path $env:GITHUB_PATH -Value (Join-Path (Split-Path -Parent (Split-Path -Parent (Get-Command git).Source)) 'bin')
+
       - name: Checkout code
         uses: actions/checkout@v4
 
