@@ -84,14 +84,18 @@ SHA-tagged images pulled from GHCR — same charts, same `helm upgrade` command.
 The CI and CD workflows declare `runs-on: self-hosted`, so they only run on a
 runner you register against the repository.
 
-1. In GitHub: **Settings → Actions → Runners → New self-hosted runner**. Follow
-   the shown commands to download and configure the agent, e.g.:
+1. In GitHub: **Settings → Actions → Runners → New self-hosted runner**. Pick
+   your OS and **copy the commands shown on that page verbatim** — GitHub fills
+   in the registration token for you, e.g.:
    ```bash
    ./config.sh --url https://github.com/<owner>/the-store --token <TOKEN>
    ./run.sh            # starts polling GitHub for jobs
    ```
-   (Install it as a service with `./svc.sh install && ./svc.sh start` to keep it
-   running across reboots.)
+   `<TOKEN>` is **not** a Personal Access Token you generate — it's the
+   short-lived **runner registration token** that page displays (valid ~1 hour,
+   single-use, only for registering). If it expires, reload the page to get a
+   fresh one. (Not to be confused with `GITHUB_TOKEN`, which the workflows use to
+   push to GHCR — see §5.)
 
 2. **Run the agent as a user that can:**
    - **Reach the Kind cluster** — a valid `~/.kube/config` with the `kind-the-store`
@@ -110,11 +114,20 @@ runner you register against the repository.
 ## 5. Configure GitHub: branch protection + GHCR
 
 ### Branch protection (enables Caso 2 / Caso 3)
-**Settings → Branches → Add rule** for `main`:
-- ✅ Require a pull request before merging (require **N** approvals).
-- ✅ Require status checks to pass before merging → select the per-service CI
-  checks (e.g. `Build & test catalog`). A failed CI check then blocks the merge
-  button.
+**Settings → Rules → Rulesets → New ruleset → New branch ruleset**:
+
+| Field | What to set |
+|-------|-------------|
+| **Ruleset Name** | anything, e.g. `protect-main` |
+| **Enforcement status** | **Active** (otherwise the rule does nothing) |
+| **Target branches** | Add target → **Include default branch** (or pattern `main`) |
+| ✅ **Require a pull request before merging** | Set **Required approvals** = `1` (or N) |
+| ✅ **Require status checks to pass** | **Add checks** → add the per-service CI checks, e.g. `Build & test catalog` |
+
+⚠️ A status check name only appears in the **Add checks** list *after it has run
+at least once* — open one PR first to let CI run, then come back and add it. A
+failed CI check then disables the merge button. Leave the other rules (signed
+commits, linear history, …) off for this POC.
 
 ### GHCR packages must be public (so Kind can pull without a secret)
 The **first** CD run creates each package as **private**. For Kind to pull the
