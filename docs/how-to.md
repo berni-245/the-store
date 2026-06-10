@@ -153,12 +153,16 @@ commits, linear history, …) off for this POC.
 This is a **one-time bootstrap per service** (5 packages total). Once a package
 is public it stays public and every later CD run is fully automated.
 
-**Why it's needed:** the **first** CD run for a service pushes the image and
-creates its GHCR package as **private**. Kind pulls images with no
-`imagePullSecret`, so on that first run `kubectl rollout status` will **fail** —
-the pod can't pull a private image. This looks like a deploy bug but it's config.
+**Whether you need to do anything depends on your account/org default package
+visibility** (Settings → Packages) and repo inheritance:
+- If your default is **public**, the first CD run creates each package public and
+  the rollout works immediately — no action needed.
+- If it's **private** (GitHub's out-of-the-box default), Kind can't pull the
+  image and `kubectl rollout status` fails with `ImagePullBackOff` until you flip
+  it. This looks like a deploy bug but it's config.
 
-**Fix it once, per service:**
+**Check each `the-store-<svc>` after the first CD run. If a package is private,
+fix it once per service:**
 1. Let the first CD run push the image (the `docker push` step succeeds even
    though the rollout then fails).
 2. **GitHub → your profile/org → Packages → `the-store-<svc>` → Package settings
@@ -285,3 +289,24 @@ choice.
 - **A job seems not to run after opening/updating a PR.** The runner *polls*
   GitHub, so there's pickup latency, and a single runner serializes jobs — give
   it a moment rather than assuming it failed.
+
+- **CD steps fail with `execvpe(/bin/bash) failed: No such file or directory`
+  (a WSL relay error).** The CD `run:` steps execute in bash, but on Windows
+  `shell: bash` resolves `bash` off `PATH`, and `C:\Windows\System32\bash.exe`
+  (the WSL launcher) usually sits *ahead* of Git Bash. With no WSL distro
+  installed it dies. The CD workflows fix this with a first
+  `runner.os == 'Windows'`-gated step that prepends Git Bash's dir
+  (`C:\Program Files\Git\bin`, derived from `git`'s own location) to
+  `$GITHUB_PATH`, so the later bash steps pick Git Bash. The step is skipped on
+  Linux, where `shell: bash` already resolves to `/bin/bash`. (Symptom of the
+  *opposite* misconfig — no `shell: bash` at all — is an empty image name:
+  `invalid tag "": repository name must have at least one component`, because the
+  bash-style `$IMAGE`/`$GITHUB_ENV` lines run under PowerShell and expand to
+  nothing.)
+
+- **`docker push` fails with `500 Internal Server Error` on the manifest PUT,
+  after every layer already shows `Pushed`.** This is a server-side GHCR hiccup,
+  not a config error — the blobs uploaded fine; only the final manifest commit
+  failed. It's almost always transient: **re-run the failed job** (the workflow
+  is unchanged, so the re-run just retries the manifest). If it recurs
+  persistently, wrap the push step in a short retry loop (3 attempts + backoff).
