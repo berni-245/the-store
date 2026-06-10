@@ -74,3 +74,5 @@ To clean up:
 ```
 docker compose down
 ```
+
+<!-- ci: trigger pipeline run -->
