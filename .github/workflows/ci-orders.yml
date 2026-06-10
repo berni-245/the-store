@@ -27,9 +27,13 @@ jobs:
 
       # Retry failed downloads and raise the HTTP read timeout (10 min) so a
       # slow/flaky runner connection doesn't abort fetching Maven dependencies.
+      # Passed via MAVEN_OPTS (JVM -D) so the Windows/PowerShell runner doesn't
+      # split the -D arguments on the command line.
       - name: Run unit tests
         working-directory: src/orders
-        run: ./mvnw test -Dmaven.wagon.http.retryHandler.count=3 -Dmaven.wagon.rto=600000
+        env:
+          MAVEN_OPTS: -Dmaven.wagon.http.retryHandler.count=3 -Dmaven.wagon.rto=600000
+        run: ./mvnw test
 
       - name: Build Docker image (no push)
         run: docker build -t the-store-orders:ci src/orders
