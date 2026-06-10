@@ -91,4 +91,4 @@ The load generator will run performance tests against your local cluster for 10 
 
 ---
 
-**The Store** - Built with ❤️ for modern e-commerce
+**The Store** - Built with ❤️ for modern e-commerce.
