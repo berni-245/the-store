@@ -74,3 +74,5 @@ To clean up:
 ```
 docker compose down
 ```
+
+<!-- ci: runner smoke test 2026-06-10 -->
