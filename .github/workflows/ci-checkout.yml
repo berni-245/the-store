@@ -1,15 +1,19 @@
 name: CI - checkout
 
-# Caso 1/2: opening or updating a PR against main builds the image and runs
-# the integration tests (Testcontainers-backed Redis). Nothing is pushed.
-# A failure blocks the merge (branch protection).
+# Caso 1/2: a PR to main builds the image and runs the integration tests
+# (Testcontainers-backed Redis). Nothing is pushed. A failure blocks the merge
+# (branch protection).
+#
+# Path filtering is done by the first step (`filter`) plus an `if:` on every later
+# step — NOT by the workflow trigger (`on.pull_request.paths`). Reason: this is a
+# REQUIRED status check, and a workflow skipped by a trigger-level path filter
+# never creates its check run, leaving the required check "pending" forever and
+# blocking merges on PRs that don't touch checkout. Here the job always runs and
+# reports `Build & test checkout`; when checkout is unchanged every real step is
+# skipped, so the check passes instantly without building anything.
 on:
   pull_request:
     branches: [main]
-    paths:
-      - 'src/checkout/**'
-      - 'charts/checkout/**'
-      - '.github/workflows/ci-checkout.yml'
 
 jobs:
   build-test:
@@ -17,10 +21,23 @@ jobs:
     runs-on: self-hosted
     timeout-minutes: 15
     steps:
+      # Reads the PR's changed-file list via the API, so it needs no checkout.
+      - name: Detect checkout changes
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            checkout:
+              - 'src/checkout/**'
+              - 'charts/checkout/**'
+              - '.github/workflows/ci-checkout.yml'
+
       - name: Checkout code
+        if: steps.filter.outputs.checkout == 'true'
         uses: actions/checkout@v4
 
       - name: Set up Node.js
+        if: steps.filter.outputs.checkout == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -29,11 +46,13 @@ jobs:
       # exposes the yarn shim for the job, so nothing has to be installed on the
       # runner host. yarn.lock is v1, so Corepack's default yarn (1.x) matches.
       - name: Enable Corepack (provides yarn)
+        if: steps.filter.outputs.checkout == 'true'
         run: corepack enable
 
       # --network-timeout 600000 gives each request 10 min (vs the 30s default)
       # so a slow/flaky runner connection doesn't abort the dependency download.
       - name: Install dependencies
+        if: steps.filter.outputs.checkout == 'true'
         working-directory: src/checkout
         run: yarn install --frozen-lockfile --network-timeout 600000
 
@@ -41,8 +60,10 @@ jobs:
       # boots the checkout app against it (no other microservice required). It
       # needs a Docker daemon, which the self-hosted runner provides.
       - name: Run integration tests
+        if: steps.filter.outputs.checkout == 'true'
         working-directory: src/checkout
         run: yarn test:integration
 
       - name: Build Docker image (no push)
+        if: steps.filter.outputs.checkout == 'true'
         run: docker build -t the-store-checkout:ci src/checkout

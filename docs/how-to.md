@@ -141,12 +141,25 @@ runner you register against the repository.
 | **Enforcement status** | **Active** (otherwise the rule does nothing) |
 | **Target branches** | Add target → **Include default branch** (or pattern `main`) |
 | ✅ **Require a pull request before merging** | Set **Required approvals** = `1` (or N) |
-| ✅ **Require status checks to pass** | **Add checks** → add the per-service CI checks, e.g. `Build & test catalog` |
+| ✅ **Require status checks to pass** | **Add checks** → add the five per-service CI checks: `Build & test catalog`, `Build & test cart`, `Build & test checkout`, `Build & test orders`, `Build & test ui` |
 
 ⚠️ A status check name only appears in the **Add checks** list *after it has run
 at least once* — open one PR first to let CI run, then come back and add it. A
 failed CI check then disables the merge button. Leave the other rules (signed
 commits, linear history, …) off for this POC.
+
+> **Why all five required checks are safe despite per-service path filtering.**
+> Path filtering is done **inside the job**, not at the workflow trigger
+> (`on.pull_request.paths`). If it were done at the trigger, a PR touching only
+> `src/ui/**` would *skip the whole* `CI - catalog` *workflow*, so its
+> `Build & test catalog` check would never be created — and a **required** check
+> that never reports stays "pending" forever, blocking the merge. Instead each
+> `ci-<svc>.yml` always triggers and its `Build & test <svc>` job always runs: a
+> first step (`dorny/paths-filter`) decides whether the service changed, and an
+> `if:` on every later step skips the build/test when it didn't. A job whose
+> steps all skip **still concludes "success"**, so unaffected services' required
+> checks pass instantly while only the touched service is actually built and
+> tested — and the PR shows exactly five checks (one per service).
 
 ### GHCR packages must be public (so Kind can pull without a secret)
 
@@ -188,8 +201,12 @@ auto-provisioned `GITHUB_TOKEN` (granted push via `permissions: packages: write`
 ## 6. How the pipeline runs
 
 ### CI — on every Pull Request to `main`
-File: `.github/workflows/ci-<svc>.yml`. Triggered only when the PR touches that
-service (path filter on `src/<svc>/**` and `charts/<svc>/**`). Steps:
+File: `.github/workflows/ci-<svc>.yml`. The workflow always triggers and its
+`Build & test <svc>` job always runs, but a first step (`dorny/paths-filter`)
+checks whether the PR touched that service (`src/<svc>/**`, `charts/<svc>/**`, or
+the workflow file). The remaining steps carry an `if:` so they run only when it
+did — otherwise they skip and the job still reports success (see §5 for why this
+matters). When the service changed, the steps are:
 1. Checkout.
 2. Set up the toolchain (Go / JDK 21 / Node 20).
 3. Run the service's tests:

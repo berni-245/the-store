@@ -1,14 +1,18 @@
 name: CI - ui
 
-# Caso 1/2: opening or updating a PR against main builds the image and runs
-# unit tests. Nothing is pushed. A failure blocks the merge (branch protection).
+# Caso 1/2: a PR to main builds the image and runs unit tests. Nothing is pushed.
+# A failure blocks the merge (branch protection).
+#
+# Path filtering is done by the first step (`filter`) plus an `if:` on every later
+# step — NOT by the workflow trigger (`on.pull_request.paths`). Reason: this is a
+# REQUIRED status check, and a workflow skipped by a trigger-level path filter
+# never creates its check run, leaving the required check "pending" forever and
+# blocking merges on PRs that don't touch ui. Here the job always runs and
+# reports `Build & test ui`; when ui is unchanged every real step is
+# skipped, so the check passes instantly without building anything.
 on:
   pull_request:
     branches: [main]
-    paths:
-      - 'src/ui/**'
-      - 'charts/ui/**'
-      - '.github/workflows/ci-ui.yml'
 
 jobs:
   build-test:
@@ -16,10 +20,23 @@ jobs:
     runs-on: self-hosted
     timeout-minutes: 15
     steps:
+      # Reads the PR's changed-file list via the API, so it needs no checkout.
+      - name: Detect ui changes
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            ui:
+              - 'src/ui/**'
+              - 'charts/ui/**'
+              - '.github/workflows/ci-ui.yml'
+
       - name: Checkout code
+        if: steps.filter.outputs.ui == 'true'
         uses: actions/checkout@v4
 
       - name: Set up JDK 21
+        if: steps.filter.outputs.ui == 'true'
         uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -30,10 +47,12 @@ jobs:
       # Passed via MAVEN_OPTS (JVM -D) so the Windows/PowerShell runner doesn't
       # split the -D arguments on the command line.
       - name: Run unit tests
+        if: steps.filter.outputs.ui == 'true'
         working-directory: src/ui
         env:
           MAVEN_OPTS: -Dmaven.wagon.http.retryHandler.count=3 -Dmaven.wagon.rto=600000
         run: ./mvnw test
 
       - name: Build Docker image (no push)
+        if: steps.filter.outputs.ui == 'true'
         run: docker build -t the-store-ui:ci src/ui
