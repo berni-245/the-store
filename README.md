@@ -22,6 +22,23 @@ The Store is built with a microservices architecture that uses different technol
 | [Checkout](./src/checkout/) | Node.js (NestJS) | Checkout orchestration and payment processing |
 
 
+## 🔄 CI/CD
+
+Each service has its own **path-filtered** CI/CD pipeline (GitHub Actions +
+per-service Helm charts), so a change only builds and deploys the service it
+touches:
+
+- **CI** (on every PR to `main`): build the image and run the service's tests —
+  nothing is pushed. A failure blocks the merge via branch protection.
+- **CD** (on merge to `main`): build and push a commit-SHA-tagged image to GHCR,
+  `helm upgrade --install` it to the Kind cluster, and gate on
+  `kubectl rollout status`; a failed rollout triggers an automatic `helm rollback`
+  to the previous release.
+
+It runs on a self-hosted runner next to the cluster. See the
+[CI/CD How-To Guide](./docs/how-to.md) for setup, branch protection, and the full
+flow.
+
 ## 🛠️ Development
 
 ### Prerequisites

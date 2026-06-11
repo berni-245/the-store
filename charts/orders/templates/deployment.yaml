@@ -42,16 +42,9 @@ spec:
             - name: http
               containerPort: 8080
               protocol: TCP
-          # Caso 4 (INTENTIONAL FAILURE): the readiness probe points at a
-          # non-existent endpoint, so the container starts but the pod never
-          # becomes Ready. CI stays green (unit tests and `docker build` never
-          # touch the chart), the PR merges, and only the CD `kubectl rollout
-          # status --timeout=120s` gate fails -> the workflow's `helm rollback`
-          # step reverts orders to the previous release. Revert this to restore
-          # a healthy deploy.
           readinessProbe:
             httpGet:
-              path: /actuator/health/this-endpoint-does-not-exist
+              path: /actuator/health/readiness
               port: 8080
             initialDelaySeconds: 10
           resources:
