@@ -18,7 +18,6 @@
 
 package com.amazon.sample.orders;
 
-import com.amazon.sample.orders.config.messaging.ApplicationEnvironmentPreparedListener;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
