@@ -75,4 +75,4 @@ To clean up:
 docker compose down
 ```
 
-<!-- ci: runner smoke test 2026-06-10 -->
+<!-- ci: trigger orders pipeline 2026-06-10 (job-level path filter test) -->
